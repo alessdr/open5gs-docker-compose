@@ -1,0 +1,14 @@
+# UDR (Unified Data Repository): Armazena dados estruturados, como informações de assinaturas, políticas e dados de exposição.
+logger:
+  level: info
+
+udr:
+  sbi:
+    server:
+      - address: 0.0.0.0
+        port: 7777
+    client:
+      nrf:
+        - uri: http://nrf:7777
+
+  db_uri: mongodb://mongodb/open5gs

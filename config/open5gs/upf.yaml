@@ -1,0 +1,17 @@
+# UPF (User Plane Function): Responsável pelo processamento e encaminhamento do tráfego de dados do usuário.
+logger:
+  level: info
+
+upf:
+  pfcp:
+    server:
+      - address: 0.0.0.0
+        port: 8805
+
+  gtpu:
+    server:
+      - address: 0.0.0.0
+        port: 2152
+
+  session:
+    - subnet: 10.45.0.0/16

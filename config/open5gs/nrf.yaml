@@ -1,0 +1,15 @@
+db_uri: mongodb://mongodb/open5gs
+
+# NRF (Network Repository Function): Atua como um repositório central para descoberta de outras Funções de Rede (NFs) na rede 5G.
+logger:
+  level: info
+
+nrf:
+  serving:
+    - plmn_id:
+        mcc: 999
+        mnc: 70
+  sbi:
+    server:
+      - address: 0.0.0.0
+        port: 7777

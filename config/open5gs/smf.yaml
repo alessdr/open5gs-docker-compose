@@ -1,0 +1,38 @@
+# SMF (Session Management Function): Responsável pelo gerenciamento de sessões, incluindo estabelecimento, modificação e liberação de sessões de dados.
+logger:
+  level: info
+
+smf:
+  sbi:
+    server:
+      - address: 0.0.0.0
+        port: 7777
+    client:
+      nrf:
+        - uri: http://nrf:7777
+
+  pfcp:
+    server:
+      - address: 0.0.0.0
+        port: 8805
+    client:
+      upf:
+        - address: upf
+          port: 8805
+
+  gtpc:
+    server:
+      - address: 0.0.0.0
+
+  gtpu:
+    server:
+      - address: 0.0.0.0
+
+  dns:
+    - 8.8.8.8
+    - 1.1.1.1
+
+  session:
+    - subnet: 10.45.0.0/16
+      gateway: 10.45.0.1
+      dnn: internet

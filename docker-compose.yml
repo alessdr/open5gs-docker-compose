@@ -1,0 +1,206 @@
+name: open5gs-5gc
+
+services:
+  # MongoDB: Banco de dados utilizado para armazenar dados de assinantes e configurações do Open5GS.
+  mongodb:
+    image: mongo:6
+    container_name: open5gs-mongodb
+    restart: unless-stopped
+    command: [ "mongod", "--bind_ip_all" ]
+    volumes:
+      - mongodb-data:/data/db
+    healthcheck:
+      test: [ "CMD-SHELL", "mongosh --quiet --eval 'db.adminCommand({ping:1}).ok' localhost:27017/admin | grep 1" ]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+
+  # NRF (Network Repository Function): Atua como um repositório central para descoberta de outras Funções de Rede (NFs) na rede 5G.
+  nrf:
+    image: gradiant/open5gs:${OPEN5GS_VERSION}
+    container_name: open5gs-nrf
+    restart: unless-stopped
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    command: [ "open5gs-nrfd", "-c", "/etc/open5gs/nrf.yaml" ]
+    volumes:
+      - ./config/open5gs/nrf.yaml:/etc/open5gs/nrf.yaml:ro
+    ports:
+      - "${NRF_SBI_PORT}:7777/tcp"
+    healthcheck:
+      test: [ "CMD-SHELL", "ss -ltn | grep -q ':7777'" ]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+
+  # AMF (Access and Mobility Management Function): Responsável pelo gerenciamento de acesso e mobilidade dos dispositivos (UEs).
+  amf:
+    image: gradiant/open5gs:${OPEN5GS_VERSION}
+    container_name: open5gs-amf
+    restart: unless-stopped
+    depends_on:
+      nrf:
+        condition: service_healthy
+    command: [ "open5gs-amfd", "-c", "/etc/open5gs/amf.yaml" ]
+    volumes:
+      - ./config/open5gs/amf.yaml:/etc/open5gs/amf.yaml:ro
+    ports:
+      - "${AMF_NGAP_PORT}:38412/sctp"
+      - "${AMF_SBI_PORT}:7777/tcp"
+    healthcheck:
+      test: [ "CMD-SHELL", "ss -ltn | grep -q ':7777'" ]
+      interval: 15s
+      timeout: 5s
+      retries: 30
+
+  # SMF (Session Management Function): Responsável pelo gerenciamento de sessões, incluindo estabelecimento, modificação e liberação de sessões de dados.
+  smf:
+    image: gradiant/open5gs:${OPEN5GS_VERSION}
+    container_name: open5gs-smf
+    restart: unless-stopped
+    depends_on:
+      nrf:
+        condition: service_healthy
+      upf:
+        condition: service_started
+    command: [ "open5gs-smfd", "-c", "/etc/open5gs/smf.yaml" ]
+    volumes:
+      - ./config/open5gs/smf.yaml:/etc/open5gs/smf.yaml:ro
+    ports:
+      - "${SMF_SBI_PORT}:7777/tcp"
+    healthcheck:
+      test: [ "CMD-SHELL", "ss -ltn | grep -q ':7777'" ]
+      interval: 15s
+      timeout: 5s
+      retries: 30
+
+  # UPF (User Plane Function): Responsável pelo processamento e encaminhamento do tráfego de dados do usuário.
+  upf:
+    image: gradiant/open5gs:${OPEN5GS_VERSION}
+    container_name: open5gs-upf
+    restart: unless-stopped
+    privileged: true
+    user: "0:0"
+    security_opt:
+      - seccomp=unconfined
+      - apparmor=unconfined
+
+    cap_add:
+      - ALL
+    devices:
+      - /dev/net/tun:/dev/net/tun
+
+    command: [ "open5gs-upfd", "-c", "/etc/open5gs/upf.yaml" ]
+    volumes:
+      - ./config/open5gs/upf.yaml:/etc/open5gs/upf.yaml:ro
+    ports:
+      - "${UPF_GTPU_PORT}:2152/udp"
+      - "${UPF_PFCP_PORT}:8805/udp"
+
+  # AUSF (Authentication Server Function): Responsável pela autenticação dos dispositivos (UEs) na rede.
+  ausf:
+    image: gradiant/open5gs:${OPEN5GS_VERSION}
+    container_name: open5gs-ausf
+    restart: unless-stopped
+    depends_on:
+      nrf:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+    command: [ "open5gs-ausfd", "-c", "/etc/open5gs/ausf.yaml" ]
+    volumes:
+      - ./config/open5gs/ausf.yaml:/etc/open5gs/ausf.yaml:ro
+    ports:
+      - "${AUSF_SBI_PORT}:7777/tcp"
+
+  # UDM (Unified Data Management): Gerencia identidades de usuários, assinaturas e dados de autenticação.
+  udm:
+    image: gradiant/open5gs:${OPEN5GS_VERSION}
+    container_name: open5gs-udm
+    restart: unless-stopped
+    depends_on:
+      nrf:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+    command: [ "open5gs-udmd", "-c", "/etc/open5gs/udm.yaml" ]
+    volumes:
+      - ./config/open5gs/udm.yaml:/etc/open5gs/udm.yaml:ro
+    ports:
+      - "${UDM_SBI_PORT}:7777/tcp"
+
+  # UDR (Unified Data Repository): Armazena dados estruturados, como informações de assinaturas, políticas e dados de exposição.
+  udr:
+    image: gradiant/open5gs:${OPEN5GS_VERSION}
+    container_name: open5gs-udr
+    restart: unless-stopped
+    environment:
+      - DB_URI=mongodb://mongodb/open5gs
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    command: [ "open5gs-udrd", "-c", "/etc/open5gs/udr.yaml" ]
+    volumes:
+      - ./config/open5gs/udr.yaml:/etc/open5gs/udr.yaml:ro
+    ports:
+      - "${UDR_SBI_PORT}:7777/tcp"
+
+  # PCF (Policy Control Function): Fornece regras de política para funções de plano de controle, como QoS e tarifação.
+  pcf:
+    image: gradiant/open5gs:${OPEN5GS_VERSION}
+    container_name: open5gs-pcf
+    restart: unless-stopped
+    environment:
+      - DB_URI=mongodb://mongodb/open5gs
+
+    depends_on:
+      nrf:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+    command: [ "open5gs-pcfd", "-c", "/etc/open5gs/pcf.yaml" ]
+    volumes:
+      - ./config/open5gs/pcf.yaml:/etc/open5gs/pcf.yaml:ro
+    ports:
+      - "${PCF_SBI_PORT}:7777/tcp"
+
+  # NSSF (Network Slice Selection Function): Seleciona as instâncias de fatias de rede (Network Slices) que servirão ao dispositivo.
+  nssf:
+    image: gradiant/open5gs:${OPEN5GS_VERSION}
+    container_name: open5gs-nssf
+    restart: unless-stopped
+    depends_on:
+      nrf:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+    command: [ "open5gs-nssfd", "-c", "/etc/open5gs/nssf.yaml" ]
+    volumes:
+      - ./config/open5gs/nssf.yaml:/etc/open5gs/nssf.yaml:ro
+    ports:
+      - "${NSSF_SBI_PORT}:7777/tcp"
+
+  # WebUI: Interface gráfica baseada na web para gerenciamento de assinantes e configurações do Open5GS.
+  webui:
+    image: gradiant/open5gs-webui:${OPEN5GS_VERSION}
+    container_name: open5gs-webui
+    restart: unless-stopped
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    environment:
+      - DB_URI=mongodb://mongodb/open5gs
+      - HOSTNAME=0.0.0.0
+      - PORT=${WEBUI_PORT}
+    ports:
+      - "${WEBUI_PORT}:${WEBUI_PORT}/tcp"
+    healthcheck:
+      test: [ "CMD-SHELL", "node -e \"const http=require('http');const p=process.env.PORT||'9999';http.get({host:'127.0.0.1',port:p,path:'/'},res=>process.exit(res.statusCode<500?0:1)).on('error',()=>process.exit(1));\"" ]
+
+      interval: 10s
+      timeout: 5s
+      retries: 30
+
+volumes:
+  mongodb-data:

@@ -1,0 +1,15 @@
+db_uri: mongodb://mongodb/open5gs
+
+# UDM (Unified Data Management): Gerencia identidades de usuários, assinaturas e dados de autenticação.
+logger:
+  level: info
+
+udm:
+  sbi:
+    server:
+      - address: 0.0.0.0
+        port: 7777
+    client:
+      nrf:
+        - uri: http://nrf:7777
+

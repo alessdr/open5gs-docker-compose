@@ -1,0 +1,15 @@
+# PCF (Policy Control Function): Fornece regras de política para funções de plano de controle, como QoS e tarifação.
+logger:
+  level: info
+
+pcf:
+  sbi:
+    server:
+      - address: 0.0.0.0
+        port: 7777
+    client:
+      nrf:
+        - uri: http://nrf:7777
+
+  db:
+    uri: mongodb://mongodb/open5gs
