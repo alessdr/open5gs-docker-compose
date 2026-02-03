@@ -14,7 +14,6 @@ Implantar e validar um ambiente de Core 5G operacional, estável e reprodutível
 *   `config/open5gs/`: Pasta contendo os arquivos de configuração YAML para cada Network Function (AMF, SMF, UPF, etc.).
 *   `start.sh` / `stop.sh` / `reset.sh`: Scripts para automação da inicialização, desligamento e limpeza total do ambiente.
 *   `doc/images/`: Pasta contendo as evidências coletadas na execução.
-*   `reset.sh`: Script para resetar o ambiente.
 
 ---
 
